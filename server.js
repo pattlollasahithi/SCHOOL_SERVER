@@ -6,6 +6,14 @@ import dotenv from 'dotenv';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
+
+// Utilities & config
+import logger from './utils/logger.js';
+import { validateEnv } from './config/validateEnv.js';
+import errorHandler from './middleware/errorHandler.js';
+import { authLimiter, apiLimiter } from './middleware/rateLimiter.js';
+
+// Routes
 import authRoutes from './routes/authRoutes.js';
 import admissionRoutes from './routes/admissionRoutes.js';
 import contactRoutes from './routes/contactRoutes.js';
@@ -13,62 +21,93 @@ import achievementRoutes from './routes/achievementRoutes.js';
 import noticeRoutes from './routes/noticeRoutes.js';
 import announcementRoutes from './routes/announcementRoutes.js';
 import chatbotRoutes from './routes/chatbotRoutes.js';
-// Load env vars
+
+// Load env vars & validate
 dotenv.config();
+validateEnv();
 
 const app = express();
+const isDev = process.env.NODE_ENV !== 'production';
 
-// Middleware
-app.use(express.json());
-app.use(cors({
-  origin: ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:5174', 'http://127.0.0.1:5174'],
-  credentials: true
-}));
-app.use(helmet({
-  crossOriginResourcePolicy: false,
-  contentSecurityPolicy: false,
-}));
-app.use(morgan('dev'));
+// --- Middleware ---
+
+// Body parsing with size limit
+app.use(express.json({ limit: '10kb' }));
+app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 app.use(cookieParser());
 
-// Database connection
-const PORT = process.env.PORT || 5000;
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/shrradha_school';
+// CORS — dynamic origins from env, fallback to localhost in dev
+const allowedOrigins = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(',').map((o) => o.trim())
+  : ['http://localhost:5173', 'http://localhost:5174'];
 
-mongoose.connect(MONGO_URI)
-  .then(() => {
-    console.log(`MongoDB Connected: ${mongoose.connection.host}`);
-  })
-  .catch((err) => {
-    console.error(`Error connecting to MongoDB: ${err.message}`);
-    console.warn(`WARNING: Server is running without a database connection. Please provide a valid MONGO_URI.`);
-  });
+app.use(cors({
+  origin: allowedOrigins,
+  credentials: true,
+}));
 
-// Only listen when running locally (not on Vercel)
-if (process.env.VERCEL !== '1') {
-  app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+// Security headers — production-safe Helmet config
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  contentSecurityPolicy: isDev ? false : undefined,
+}));
+
+// Request logging — only in development
+if (isDev) {
+  app.use(morgan('dev'));
 }
 
-// Basic Route
+// Global rate limiter
+app.use('/api/', apiLimiter);
+
+// --- Health Check ---
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+  });
+});
+
+// --- Routes ---
 app.get('/', (req, res) => {
   res.send('SHRRADHA HIGH SCHOOL API is running...');
 });
 
-// Routes
-app.use('/api/auth', authRoutes);
+app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/admissions', admissionRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/achievements', achievementRoutes);
 app.use('/api/notices', noticeRoutes);
 app.use('/api/announcements', announcementRoutes);
 app.use('/api/chat', chatbotRoutes);
+
 // Serve uploads folder for local storage fallback
 const __dirname = path.resolve();
 app.use('/uploads', express.static(path.join(__dirname, '/uploads')));
 
-// Basic Route
-app.get('/', (req, res) => {
-  res.send('SHRRADHA HIGH SCHOOL API is running...');
-});
+// --- Centralized Error Handler (must be last) ---
+app.use(errorHandler);
+
+// --- Database Connection ---
+const PORT = process.env.PORT || 5000;
+const MONGO_URI = process.env.MONGO_URI;
+
+mongoose.connect(MONGO_URI)
+  .then(() => {
+    logger.info(`MongoDB Connected: ${mongoose.connection.host}`);
+  })
+  .catch((err) => {
+    logger.error(`Error connecting to MongoDB: ${err.message}`);
+    if (process.env.NODE_ENV === 'production') {
+      process.exit(1);
+    }
+    logger.warn('Server is running without a database connection.');
+  });
+
+// Only listen when running locally (not on Vercel)
+if (process.env.VERCEL !== '1') {
+  app.listen(PORT, () => logger.info(`Server running on port ${PORT}`));
+}
 
 export default app;

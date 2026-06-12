@@ -1,6 +1,7 @@
 import Groq from "groq-sdk";
 import fs from 'fs';
 import path from 'path';
+import logger from '../utils/logger.js';
 
 const __dirname = path.resolve();
 
@@ -48,7 +49,7 @@ export const chatbotQuery = async (req, res) => {
     return res.json({ reply });
 
   } catch (error) {
-    console.error("Chatbot Error:", error);
+    logger.error("Chatbot Error:", error.message);
     
     // Fallback for API limit or failure
     if (error.status === 429 || (error.message && error.message.includes("429"))) {
