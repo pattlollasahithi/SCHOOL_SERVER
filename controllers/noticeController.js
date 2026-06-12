@@ -14,10 +14,10 @@ export const getNotices = asyncHandler(async (req, res) => {
 // @access  Private/Admin
 export const createNotice = asyncHandler(async (req, res) => {
   const { title, description, date } = req.body;
-  let file = req.file ? req.file.path : '';
-
-  if (file && !file.startsWith('http')) {
-    file = `${req.protocol}://${req.get('host')}/${file.replace(/\\/g, '/')}`;
+  let file = '';
+  if (req.file) {
+    const base64Str = req.file.buffer.toString('base64');
+    file = `data:${req.file.mimetype};base64,${base64Str}`;
   }
 
   const notice = await Notice.create({
@@ -41,11 +41,8 @@ export const updateNotice = asyncHandler(async (req, res) => {
     notice.description = req.body.description || notice.description;
     notice.date = req.body.date || notice.date;
     if (req.file) {
-      let filePath = req.file.path;
-      if (!filePath.startsWith('http')) {
-        filePath = `${req.protocol}://${req.get('host')}/${filePath.replace(/\\/g, '/')}`;
-      }
-      notice.file = filePath;
+      const base64Str = req.file.buffer.toString('base64');
+      notice.file = `data:${req.file.mimetype};base64,${base64Str}`;
     }
 
     const updatedNotice = await notice.save();

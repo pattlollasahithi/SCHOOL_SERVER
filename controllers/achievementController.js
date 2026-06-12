@@ -14,15 +14,14 @@ export const getAchievements = asyncHandler(async (req, res) => {
 // @access  Private/Admin
 export const createAchievement = asyncHandler(async (req, res) => {
   const { title, description, date, category } = req.body;
-  let image = req.file ? req.file.path : '';
+  let image = '';
+  if (req.file) {
+    const base64Str = req.file.buffer.toString('base64');
+    image = `data:${req.file.mimetype};base64,${base64Str}`;
+  }
 
   if (!image) {
     return res.status(400).json({ message: 'Please upload an image' });
-  }
-
-  // If local storage, convert to full URL
-  if (!image.startsWith('http')) {
-    image = `${req.protocol}://${req.get('host')}/${image.replace(/\\/g, '/')}`;
   }
 
   const achievement = await Achievement.create({
@@ -47,11 +46,8 @@ export const updateAchievement = asyncHandler(async (req, res) => {
     achievement.description = req.body.description || achievement.description;
     achievement.date = req.body.date || achievement.date;
     if (req.file) {
-      let filePath = req.file.path;
-      if (!filePath.startsWith('http')) {
-        filePath = `${req.protocol}://${req.get('host')}/${filePath.replace(/\\/g, '/')}`;
-      }
-      achievement.image = filePath;
+      const base64Str = req.file.buffer.toString('base64');
+      achievement.image = `data:${req.file.mimetype};base64,${base64Str}`;
     }
 
     const updatedAchievement = await achievement.save();

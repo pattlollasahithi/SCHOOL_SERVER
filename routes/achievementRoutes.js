@@ -2,8 +2,8 @@ import express from 'express';
 import { 
   getAchievements, 
   createAchievement, 
-  updateAchievement, 
-  deleteAchievement 
+  updateAchievement,
+  deleteAchievement
 } from '../controllers/achievementController.js';
 import { protect, admin } from '../middleware/authMiddleware.js';
 import upload from '../config/cloudinary.js';
