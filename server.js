@@ -44,7 +44,10 @@ mongoose.connect(MONGO_URI)
     console.warn(`WARNING: Server is running without a database connection. Please provide a valid MONGO_URI.`);
   });
 
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+// Only listen when running locally (not on Vercel)
+if (process.env.VERCEL !== '1') {
+  app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+}
 
 // Basic Route
 app.get('/', (req, res) => {
@@ -67,3 +70,5 @@ app.use('/uploads', express.static(path.join(__dirname, '/uploads')));
 app.get('/', (req, res) => {
   res.send('SHRRADHA HIGH SCHOOL API is running...');
 });
+
+export default app;
