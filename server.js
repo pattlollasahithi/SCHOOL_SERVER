@@ -1,6 +1,6 @@
 import express from 'express';
 import path from 'path';
-import mongoose from 'mongoose';
+import connectDB from './config/db.js';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import helmet from 'helmet';
@@ -25,6 +25,7 @@ import chatbotRoutes from './routes/chatbotRoutes.js';
 // Load env vars & validate
 dotenv.config();
 validateEnv();
+connectDB();
 
 const app = express();
 const isDev = process.env.NODE_ENV !== 'production';
@@ -89,21 +90,7 @@ app.use('/uploads', express.static(path.join(__dirname, '/uploads')));
 // --- Centralized Error Handler (must be last) ---
 app.use(errorHandler);
 
-// --- Database Connection ---
 const PORT = process.env.PORT || 5000;
-const MONGO_URI = process.env.MONGO_URI;
-
-mongoose.connect(MONGO_URI)
-  .then(() => {
-    logger.info(`MongoDB Connected: ${mongoose.connection.host}`);
-  })
-  .catch((err) => {
-    logger.error(`Error connecting to MongoDB: ${err.message}`);
-    if (process.env.NODE_ENV === 'production') {
-      process.exit(1);
-    }
-    logger.warn('Server is running without a database connection.');
-  });
 
 // Only listen when running locally (not on Vercel)
 if (process.env.VERCEL !== '1') {
